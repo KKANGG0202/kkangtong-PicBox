@@ -470,6 +470,12 @@
     /* Icon-only toolbar buttons on narrow screens. */
     .pbx-toolbar .pbx-btn span { display: none; }
     .pbx-toolbar .pbx-btn { width: 34px; padding: 0; }
+    .pbx-toolbar { flex-wrap: nowrap; }
+    .pbx-toolbar .pbx-select { flex: 1 1 0; min-width: 0; max-width: none; }
+    .pbx-toolbar .pbx-select + .pbx-spacer { display: none; }
+    .pbx-tabs { justify-content: space-between; }
+    .pbx-tab { flex: 1 1 0; justify-content: center; padding: 0 4px; gap: 4px; min-width: 0; }
+    .pbx-tab i { display: none; }
     .pbx-stat-total { grid-template-columns: 1fr 1fr; }
     .pbx-stat-total > div:last-child { grid-column: span 2; }
     .pbx-stat-row { grid-template-columns: 1fr auto; row-gap: 4px; }

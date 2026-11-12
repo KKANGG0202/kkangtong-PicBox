@@ -48,45 +48,58 @@ async function loadFolderCounts() {
 const SHOW_ALL = '__pbx_all__';
 
 /**
- * Characters for the picker: the open one first, then by name. Duplicate names show their card file.
- * By default only characters whose image folder has pictures are listed.
+ * Characters for the picker, one entry per character NAME. Cards that share a name
+ * (copies, sync-conflict duplicates) also share one image folder, so they are merged.
+ * The option value (`avatar` field) is the name. By default only names with pictures are listed.
  */
 function characterOptions() {
-    const list = (ctx().characters || []).filter(ch => ch?.avatar && ch?.name);
-    const names = new Map();
-    for (const ch of list) names.set(ch.name, (names.get(ch.name) || 0) + 1);
-    const current = currentCharacter()?.avatar;
-    const imageCount = ch => folderCounts?.get(sanitizeLikeServer(ch.name)) || folderCounts?.get(ch.name) || 0;
+    const groups = new Map();
+    for (const ch of ctx().characters || []) {
+        if (!ch?.avatar || !ch?.name) continue;
+        if (!groups.has(ch.name)) groups.set(ch.name, []);
+        groups.get(ch.name).push(ch);
+    }
+    const current = currentCharacter()?.name;
+    const imageCount = name => folderCounts?.get(sanitizeLikeServer(name)) || folderCounts?.get(name) || 0;
     const filtering = folderCounts && folderCounts.size && !state?.showAllChars;
-    return list
-        .filter(ch => !filtering || imageCount(ch) > 0 || ch.avatar === state?.charAvatar)
-        .map(ch => {
-            const base = names.get(ch.name) > 1 ? `${ch.name} (${ch.avatar.replace(/\.png$/i, '')})` : ch.name;
-            const n = imageCount(ch);
-            return { avatar: ch.avatar, name: base, count: n, label: n ? `${base} · ${n}장` : base };
+    return [...groups.entries()]
+        .filter(([name]) => !filtering || imageCount(name) > 0 || name === state?.charAvatar)
+        .map(([name, cards]) => {
+            const n = imageCount(name);
+            const copies = cards.length > 1 ? ` (카드 ${cards.length}개)` : '';
+            return { avatar: name, name, count: n, label: `${name}${n ? ` · ${n}장` : ''}${copies}` };
         })
         .sort((a, b) => (b.avatar === current) - (a.avatar === current) || a.name.localeCompare(b.name));
 }
 
-async function characterItems(avatar, onProgress, isStale) {
-    const character = (ctx().characters || []).find(ch => ch?.avatar === avatar);
-    if (!character) return null;
-    const files = await listCharacterChats(character.avatar);
+/** All chats of every card with this name. */
+async function characterItems(name, onProgress, isStale) {
+    const cards = (ctx().characters || []).filter(ch => ch?.avatar && ch.name === name);
+    if (!cards.length) return null;
     const current = currentChatId();
-    const isOpenCharacter = currentCharacter()?.avatar === avatar;
-    const all = [];
-    for (let i = 0; i < files.length; i++) {
+    const openAvatar = currentCharacter()?.avatar;
+    const jobs = [];
+    for (const card of cards) {
         if (isStale()) return null;
-        onProgress(`채팅 불러오는 중… ${i + 1} / ${files.length}`);
-        const file = files[i];
-        const isCurrent = isOpenCharacter && file === current;
+        try {
+            for (const file of await listCharacterChats(card.avatar)) jobs.push({ card, file });
+        } catch { /* card without chats */ }
+    }
+    const all = [];
+    for (let i = 0; i < jobs.length; i++) {
+        if (isStale()) return null;
+        onProgress(`채팅 불러오는 중… ${i + 1} / ${jobs.length}`);
+        const { card, file } = jobs[i];
+        const isCurrent = card.avatar === openAvatar && file === current;
         try {
             // The open chat is read from memory so unsaved changes show up.
-            const messages = isCurrent ? (ctx().chat || []) : await loadCharacterChat(character, file);
-            all.push(...collectImages(messages, { chatFile: file, charName: character.name, avatar: character.avatar, isCurrent }));
+            const messages = isCurrent ? (ctx().chat || []) : await loadCharacterChat(card, file);
+            all.push(...collectImages(messages, { chatFile: file, charName: card.name, avatar: card.avatar, isCurrent }));
         } catch { /* skip unreadable chat */ }
     }
-    return all;
+    // The same image can appear in a chat and in its sync-conflict copy: keep one.
+    const seen = new Set();
+    return all.filter(item => !seen.has(item.key) && seen.add(item.key));
 }
 
 /** "blonde hair, office, -nsfw": every term must appear in the prompt, "-term" must not. */
@@ -136,7 +149,7 @@ export function openGallery(tab = 'chat') {
         query: '',
         view: 'grid',
         favFolder: '',
-        charAvatar: currentCharacter()?.avatar || '',
+        charAvatar: currentCharacter()?.name || '',
         showAllChars: false,
         selectMode: false,
         selected: new Set(),
@@ -400,6 +413,11 @@ async function switchTab(tab, keepView = false) {
             if (isStale() || !items) return;
             charCache.set(avatar, items);
             setItems([...items]);
+            const inFolder = characterOptions().find(o => o.avatar === avatar)?.count || 0;
+            if (!items.length && inFolder) {
+                // Pictures exist in the folder but no chat of this character uses them.
+                $('.pbx-empty')?.replaceChildren(`이 캐릭터의 채팅에 붙어 있는 그림이 없어요. 폴더에 남은 ${inFolder}장은 관리 → 안 쓰는 그림에서 볼 수 있어요.`);
+            }
         } catch (error) {
             if (!isStale()) showMessage(`불러오지 못했어요: ${error?.message || error}`);
         }
