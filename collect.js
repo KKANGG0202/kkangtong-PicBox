@@ -103,7 +103,8 @@ export function collectImages(messages, meta = {}) {
                 file,
                 mesId,
                 prompt,
-                excerpt: messageExcerpt(message.mes),
+                // Chat Translation keeps the translated text in extra.display_text.
+                excerpt: messageExcerpt(message.extra?.display_text || message.mes),
                 speaker: message.name || '',
                 date: message.send_date || '',
                 chatFile: meta.chatFile || '',

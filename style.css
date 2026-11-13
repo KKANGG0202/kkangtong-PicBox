@@ -413,6 +413,7 @@ body.pbx-longpress #chat .mes .mes_text img {
 .pbx-story-meta { display: flex; align-items: center; justify-content: space-between; font-size: 12px; opacity: 0.7; }
 .pbx-story-text { font-size: 14px; line-height: 1.65; white-space: pre-wrap; word-break: break-word; }
 .pbx-story-text:empty { display: none; }
+.pbx-story-modes { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; }
 
 /* ---------- manage tab ---------- */
 .pbx-manage { display: flex; flex-direction: column; gap: 10px; }

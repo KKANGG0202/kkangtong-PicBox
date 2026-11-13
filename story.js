@@ -1,7 +1,14 @@
 // Story view: images in message order with the text of their message, like a webtoon.
 // Only images near the screen keep their src, so long stories stay light on phones.
-import { escapeHtml } from './settings.js';
+import { escapeHtml, getSettings, saveSettings } from './settings.js';
 import { jumpTo, isFavorite } from './grid.js';
+
+/** Only the spoken lines of a message ("…", “…”, 「…」, 『…』), one per line. */
+function dialogueOnly(text) {
+    const lines = [...String(text || '').matchAll(/"([^"\n]{1,400})"|“([^”\n]{1,400})”|「([^」\n]{1,400})」|『([^』\n]{1,400})』/g)]
+        .map(m => (m[1] ?? m[2] ?? m[3] ?? m[4]).trim()).filter(Boolean);
+    return lines.map(line => `"${line}"`).join('\n');
+}
 
 function chatTitle(file) {
     const match = String(file || '').match(/(\d{4}-\d{2}-\d{2})@(\d{2})h(\d{2})m/);
@@ -26,6 +33,25 @@ export function renderStory(container, items, options) {
     const list = [...items].sort((a, b) => String(a.chatFile).localeCompare(String(b.chatFile)) || (a.mesId ?? 0) - (b.mesId ?? 0));
     const story = document.createElement('div');
     story.className = 'pbx-story';
+    const settings = getSettings();
+
+    const modes = document.createElement('div');
+    modes.className = 'pbx-chips pbx-story-modes';
+    modes.innerHTML = `
+        <button class="pbx-chip" data-lines="0">전체 글</button>
+        <button class="pbx-chip" data-lines="1">그림 + 대사만</button>`;
+    story.appendChild(modes);
+    const texts = [];
+    const drawText = () => {
+        const linesOnly = !!settings.storyLinesOnly;
+        modes.querySelectorAll('.pbx-chip').forEach(chip => chip.classList.toggle('active', (chip.dataset.lines === '1') === linesOnly));
+        texts.forEach(({ el, item }) => { el.textContent = linesOnly ? dialogueOnly(item.excerpt) : (item.excerpt || ''); });
+    };
+    modes.querySelectorAll('.pbx-chip').forEach(chip => chip.addEventListener('click', () => {
+        settings.storyLinesOnly = chip.dataset.lines === '1';
+        saveSettings();
+        drawText();
+    }));
 
     let lastChat = null;
     list.forEach((item, index) => {
@@ -46,11 +72,12 @@ export function renderStory(container, items, options) {
                 <button class="pbx-btn pbx-icon pbx-story-jump" title="메시지로 이동"><i class="fa-solid fa-location-arrow"></i></button>
             </div>
             <div class="pbx-story-text"></div>`;
-        card.querySelector('.pbx-story-text').textContent = item.excerpt || '';
+        texts.push({ el: card.querySelector('.pbx-story-text'), item });
         card.querySelector('.pbx-story-img').addEventListener('click', () => options.onOpen(index, list));
         card.querySelector('.pbx-story-jump').addEventListener('click', () => jumpTo(item, options.closeAll));
         story.appendChild(card);
     });
+    drawText();
     container.appendChild(story);
 
     const root = container.closest('.pbx-body') || null;
