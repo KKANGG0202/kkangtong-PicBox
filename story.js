@@ -2,11 +2,12 @@
 // Only images near the screen keep their src, so long stories stay light on phones.
 import { escapeHtml, getSettings, saveSettings } from './settings.js';
 import { jumpTo, isFavorite } from './grid.js';
+import { visibleText } from './collect.js';
 
-/** Only the spoken lines of a message ("…", “…”, 「…」, 『…』), one per line. */
+/** Every spoken line of a message ("…", “…”, 「…」, 『…』), in order, one per line. */
 function dialogueOnly(text) {
-    const lines = [...String(text || '').matchAll(/"([^"\n]{1,400})"|“([^”\n]{1,400})”|「([^」\n]{1,400})」|『([^』\n]{1,400})』/g)]
-        .map(m => (m[1] ?? m[2] ?? m[3] ?? m[4]).trim()).filter(Boolean);
+    const lines = [...String(text || '').matchAll(/"([^"]+)"|“([^”]+)”|「([^」]+)」|『([^』]+)』/g)]
+        .map(m => (m[1] ?? m[2] ?? m[3] ?? m[4]).replace(/\s*\n\s*/g, ' ').trim()).filter(Boolean);
     return lines.map(line => `"${line}"`).join('\n');
 }
 
@@ -45,7 +46,13 @@ export function renderStory(container, items, options) {
     const drawText = () => {
         const linesOnly = !!settings.storyLinesOnly;
         modes.querySelectorAll('.pbx-chip').forEach(chip => chip.classList.toggle('active', (chip.dataset.lines === '1') === linesOnly));
-        texts.forEach(({ el, item }) => { el.textContent = linesOnly ? dialogueOnly(item.excerpt) : (item.excerpt || ''); });
+        texts.forEach(entry => { if (entry.shown) fill(entry); });
+    };
+    // Text is read the way it shows on screen, only for cards near the view, so big stories stay quick.
+    const fill = entry => {
+        entry.shown = true;
+        const text = visibleText(entry.item);
+        entry.el.textContent = settings.storyLinesOnly ? dialogueOnly(text) : text;
     };
     modes.querySelectorAll('.pbx-chip').forEach(chip => chip.addEventListener('click', () => {
         settings.storyLinesOnly = chip.dataset.lines === '1';
@@ -87,6 +94,8 @@ export function renderStory(container, items, options) {
             const item = list[Number(entry.target.dataset.index)];
             if (entry.isIntersecting) {
                 if (!img.getAttribute('src')) img.src = item.url;
+                const slot = texts[Number(entry.target.dataset.index)];
+                if (!slot.shown) fill(slot);
             } else if (img.getAttribute('src') && img.naturalWidth) {
                 // Keep the box size so the scroll position does not jump, then free the image.
                 img.parentElement.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;

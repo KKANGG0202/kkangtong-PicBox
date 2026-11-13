@@ -41,6 +41,44 @@ export function messageExcerpt(text, limit = 2000) {
     return plain.length > limit ? `${plain.slice(0, limit).trimEnd()}…` : plain;
 }
 
+let measureHost = null;
+
+/**
+ * The message text exactly as it shows on screen (translation, regex and theme hiding applied).
+ * Current chat: read the rendered message. Other chats: render it the same way ST does, off screen.
+ */
+export function visibleText(item) {
+    if (typeof item._visible === 'string') return item._visible;
+    let text = null;
+    try {
+        if (item.isCurrent && Number.isInteger(item.mesId)) {
+            const el = document.querySelector(`#chat .mes[mesid="${item.mesId}"] .mes_text`);
+            if (el) text = el.innerText;
+        }
+        const format = SillyTavern.getContext().messageFormatting;
+        if (text === null && typeof item.raw === 'string' && typeof format === 'function') {
+            if (!measureHost) {
+                measureHost = document.createElement('div');
+                measureHost.id = 'pbx_measure';
+                measureHost.setAttribute('aria-hidden', 'true');
+                measureHost.style.cssText = 'position:absolute;left:-100000px;top:0;width:640px;pointer-events:none;';
+                measureHost.innerHTML = `<div class="mes"><div class="mes_block"><div class="mes_text"></div></div></div>`;
+            }
+            document.body.appendChild(measureHost);
+            const box = measureHost.querySelector('.mes_text');
+            box.innerHTML = format(item.raw, item.speaker || '', false, !!item.isUser, item.mesId);
+            text = box.innerText;
+            box.replaceChildren();
+            measureHost.remove();
+        }
+    } catch (error) {
+        console.warn('[PicBox] visible text', error);
+    }
+    if (text === null) return item.excerpt || '';
+    item._visible = text.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    return item._visible;
+}
+
 /** Drop the chat header line returned by the chats API. */
 export function stripHeader(messages) {
     if (!Array.isArray(messages)) return [];
@@ -105,6 +143,8 @@ export function collectImages(messages, meta = {}) {
                 prompt,
                 // Chat Translation keeps the translated text in extra.display_text.
                 excerpt: messageExcerpt(message.extra?.display_text || message.mes),
+                raw: message.extra?.display_text || message.mes || '',
+                isUser: !!message.is_user,
                 speaker: message.name || '',
                 date: message.send_date || '',
                 chatFile: meta.chatFile || '',

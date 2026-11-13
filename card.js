@@ -2,6 +2,7 @@
 // Fonts are free Google Fonts (SIL Open Font License), loaded only when the card maker opens.
 import { downloadBlob, getSettings, saveSettings } from './settings.js';
 import { safeName } from './zip.js';
+import { visibleText } from './collect.js';
 
 const WIDTH = 1080;
 const THEMES = {
@@ -288,7 +289,7 @@ export async function openCard(item) {
     };
     const changed = () => { syncControls(); remember(); draw(); };
 
-    const candidates = lineCandidates(item.excerpt);
+    const candidates = lineCandidates(visibleText(item));
     let pick = 0;
     state.text = candidates[0];
     const showPick = () => {
