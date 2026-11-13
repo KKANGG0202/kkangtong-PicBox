@@ -7,6 +7,7 @@ import { initRetry } from './retry.js';
 import { openGallery } from './gallery.js';
 import { openDraw } from './draw.js';
 import { syncInputButton } from './inputbutton.js';
+import { initStrip } from './strip.js';
 
 function closeWandMenu() {
     document.getElementById('extensionsMenu')?.classList.remove('openDrawer');
@@ -54,6 +55,7 @@ function registerCommands() {
         initFold();
         initLongPress();
         initRetry();
+        initStrip();
         syncInputButton();
         // Some themes or extensions rebuild the input bar later.
         setTimeout(syncInputButton, 3000);

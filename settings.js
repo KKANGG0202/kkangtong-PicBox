@@ -17,6 +17,8 @@ const defaultSettings = Object.freeze({
     inputButton: true,
     floatSide: 'right',
     photoNote: true,
+    autoStripTags: false,
+    storyLinesOnly: false,
 });
 
 export function ctx() {

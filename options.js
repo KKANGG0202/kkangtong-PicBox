@@ -44,6 +44,11 @@ export function renderOptions(container) {
                 <small>꺼두면(기본) 그린 그림은 전부 폴더에 남아요. 채팅에 안 붙인 그림은 "관리 → 안 쓰는 그림"에서 볼 수 있어요.</small>
             </section>
             <section>
+                <h4><i class="fa-solid fa-eraser"></i> 태그 자동 지우기</h4>
+                <label class="pbx-check-label"><input type="checkbox" data-key="autoStripTags"><span>메시지를 보낼 때 이전 메시지의 &lt;autopic&gt; 태그 글 지우기</span></label>
+                <small>꺼두면(기본) 그대로 두고, 필요할 때 "관리 → 태그 정리"에서 한 번에 지울 수 있어요. 그림은 그대로 남아요.</small>
+            </section>
+            <section>
                 <h4><i class="fa-solid fa-file-zipper"></i> 내보내기</h4>
                 <label class="pbx-check-label"><input type="checkbox" data-key="zipWithPrompts"><span>ZIP에 프롬프트(prompts.txt) 같이 넣기</span></label>
             </section>

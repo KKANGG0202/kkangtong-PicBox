@@ -3,11 +3,13 @@ import { ctx, getSettings, saveSettings, postJson, confirmPopup, escapeHtml, for
 import { renderCleanup, sanitizeLikeServer, fileTime } from './cleanup.js';
 import { exportItems } from './grid.js';
 import { renderOptions } from './options.js';
+import { renderStrip } from './strip.js';
 
 const SUBTABS = [
     { id: 'stats', label: '통계', icon: 'fa-chart-simple' },
     { id: 'clean', label: '안 쓰는 그림', icon: 'fa-broom' },
     { id: 'shrink', label: '용량 줄이기', icon: 'fa-compress' },
+    { id: 'strip', label: '태그 정리', icon: 'fa-eraser' },
     { id: 'options', label: '설정', icon: 'fa-gear' },
 ];
 const RECENT_MS = 30 * 60 * 1000;
@@ -71,6 +73,7 @@ export function renderManage(body, host, startSub = 'stats') {
         if (id === 'clean') disposeSub = renderCleanup(subBody, host, { folder: preferredFolder });
         else if (id === 'stats') disposeSub = renderStats(subBody, open);
         else if (id === 'options') disposeSub = renderOptions(subBody);
+        else if (id === 'strip') disposeSub = renderStrip(subBody);
         else disposeSub = renderShrink(subBody, preferredFolder);
     }
     body.querySelectorAll('.pbx-subtabs .pbx-chip').forEach(chip => chip.addEventListener('click', () => open(chip.dataset.sub)));
