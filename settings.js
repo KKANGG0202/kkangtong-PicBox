@@ -12,6 +12,11 @@ const defaultSettings = Object.freeze({
     favFolders: [],
     webpQuality: 90,
     webpBackup: true,
+    longPressViewer: true,
+    drawAutoDelete: false,
+    inputButton: true,
+    floatSide: 'right',
+    photoNote: true,
 });
 
 export function ctx() {

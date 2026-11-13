@@ -24,7 +24,7 @@ function decodeEntities(text) {
 const IMG_SRC = /<img\b[^>]*?\ssrc\s*=\s*["']([^"']+)["']/gi;
 
 /** Plain text of a message for the story view: no AutoPic blocks, no HTML, no code. */
-export function messageExcerpt(text, limit = 600) {
+export function messageExcerpt(text, limit = 2000) {
     let plain = String(text || '')
         .replace(/<autopic\b[\s\S]*?<\/autopic>/gi, ' ')
         .replace(/&lt;autopic\b[\s\S]*?&lt;\/autopic&gt;/gi, ' ')

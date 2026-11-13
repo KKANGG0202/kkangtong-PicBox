@@ -2,7 +2,7 @@
 import { ctx, currentChatId, currentCharacter, DISPLAY_NAME, escapeHtml, confirmPopup, postJson, runPool } from './settings.js';
 import { sanitizeLikeServer } from './cleanup.js';
 import { collectImages, listCharacterChats, loadCharacterChat, itemTime } from './collect.js';
-import { renderGrid, openViewer, exportItems, favoriteItems, setFavorite, favFolders, removeFavFolder, setInFolder, openFolderPicker } from './grid.js';
+import { renderGrid, openViewer, exportItems, favoriteItems, setFavorite, favFolders, removeFavFolder, setInFolder, openFolderPicker, deleteItems } from './grid.js';
 import { renderManage } from './manage.js';
 import { renderStory } from './story.js';
 
@@ -247,9 +247,23 @@ function applyFilter() {
     drawItems();
 }
 
+/** Remove deleted pictures from every list of the open window. */
+function dropDeleted(removed) {
+    if (!state || !removed?.size) return;
+    for (const [key, list] of charCache) charCache.set(key, list.filter(item => !removed.has(item.key)));
+    for (const key of removed) state.selected.delete(key);
+    for (const key of removed) {
+        const folder = key.replace(/^\/user\/images\//, '').split('/')[0];
+        if (folderCounts?.has(folder)) folderCounts.set(folder, Math.max(0, folderCounts.get(folder) - 1));
+    }
+    state.all = state.all.filter(item => !removed.has(item.key));
+    applyFilter();
+}
+
 function viewerOptions() {
     return {
         closeAll: closeGallery,
+        onDelete: dropDeleted,
         onChange: () => { if (state?.tab === 'fav') reloadTab(); else drawItems(); },
     };
 }
@@ -316,6 +330,7 @@ function drawToolbar() {
         <button title="ZIP" class="pbx-btn pbx-zip" ${none}><i class="fa-solid fa-file-zipper"></i><span>ZIP</span></button>
         <button title="폴더" class="pbx-btn pbx-folder" ${none}><i class="fa-solid fa-folder-plus"></i><span>폴더</span></button>
         <button title="${unfav ? (isFolder ? '폴더에서 빼기' : '즐겨찾기 해제') : '즐겨찾기'}" class="pbx-btn pbx-star" ${none}><i class="fa-${unfav ? 'regular' : 'solid'} fa-star"></i><span>${unfav ? (isFolder ? '폴더에서 빼기' : '해제') : '즐겨찾기'}</span></button>
+        <button title="삭제" class="pbx-btn pbx-danger pbx-delete" ${none}><i class="fa-solid fa-trash"></i><span>삭제</span></button>
         <button title="취소" class="pbx-btn pbx-cancel"><i class="fa-solid fa-xmark"></i><span>취소</span></button>`, bar => {
         bar.querySelector('.pbx-all').addEventListener('click', () => {
             if (state.selected.size === n) state.selected.clear();
@@ -339,6 +354,12 @@ function drawToolbar() {
             state.selectMode = false;
             state.selected.clear();
             reloadTab();
+        });
+        bar.querySelector('.pbx-delete').addEventListener('click', async () => {
+            const removed = await deleteItems(picked);
+            if (!removed.size) return;
+            state.selectMode = false;
+            dropDeleted(removed);
         });
         bar.querySelector('.pbx-cancel').addEventListener('click', () => { state.selectMode = false; state.selected.clear(); drawItems(); });
     });

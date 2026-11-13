@@ -2,6 +2,8 @@
 import { getSettings, saveSettings } from './settings.js';
 import { applyFold } from './fold.js';
 import { clearThumbs } from './thumbs.js';
+import { syncLongPressClass } from './longpress.js';
+import { syncInputButton, buttonMode } from './inputbutton.js';
 
 export function renderOptions(container) {
     const settings = getSettings();
@@ -22,6 +24,26 @@ export function renderOptions(container) {
                 <small>그림이 붙은 메시지만 세요. 예를 들어 3이면 그림 있는 최근 메시지 3개는 그대로 보이고, 그보다 오래된 그림은 "그림 보기" 버튼으로 접혀서 불러오지 않아요. 채팅 파일은 바뀌지 않아요.</small>
             </section>
             <section>
+                <h4><i class="fa-solid fa-hand-pointer"></i> 채팅 그림 길게 누르기</h4>
+                <label class="pbx-check-label"><input type="checkbox" data-key="longPressViewer"><span>길게 누르면 픽박스 뷰어로 보기</span></label>
+                <small>그냥 누르면 실리 기본 확대 그대로예요. 길게 누르거나(폰) 우클릭하면(PC) 프롬프트·즐겨찾기·삭제가 있는 픽박스 뷰어가 열려요.</small>
+            </section>
+            <section>
+                <h4><i class="fa-solid fa-palette"></i> 픽박스로 그리기</h4>
+                <div class="pbx-opt-row"><span>📷 버튼</span>
+                    <span class="pbx-chips pbx-btnmode">
+                        <button class="pbx-chip" data-mode="input">입력창</button>
+                        <button class="pbx-chip" data-mode="float-left">플로팅 왼쪽</button>
+                        <button class="pbx-chip" data-mode="float-right">플로팅 오른쪽</button>
+                        <button class="pbx-chip" data-mode="off">끄기</button>
+                    </span>
+                </div>
+                <label class="pbx-check-label"><input type="checkbox" data-key="photoNote"><span>내가 보낸 사진 내용을 AI에게 알려주기</span></label>
+                <small>"내 메시지로 보내기"를 할 때, 요청 내용과 장면·포즈·옷 같은 디테일을 화면에 안 보이는 메모로 같이 보내요. 외모 태그는 넣지 않아요.</small>
+                <label class="pbx-check-label"><input type="checkbox" data-key="drawAutoDelete"><span>채팅에 안 붙인 그림은 창 닫을 때 지우기</span></label>
+                <small>꺼두면(기본) 그린 그림은 전부 폴더에 남아요. 채팅에 안 붙인 그림은 "관리 → 안 쓰는 그림"에서 볼 수 있어요.</small>
+            </section>
+            <section>
                 <h4><i class="fa-solid fa-file-zipper"></i> 내보내기</h4>
                 <label class="pbx-check-label"><input type="checkbox" data-key="zipWithPrompts"><span>ZIP에 프롬프트(prompts.txt) 같이 넣기</span></label>
             </section>
@@ -38,8 +60,27 @@ export function renderOptions(container) {
             settings[input.dataset.key] = input.checked;
             saveSettings();
             applyFold();
+            syncLongPressClass();
+            syncInputButton();
         });
     });
+
+    const modeChips = container.querySelectorAll('.pbx-btnmode .pbx-chip');
+    const drawMode = () => {
+        const mode = buttonMode();
+        const current = mode === 'float' ? `float-${settings.floatSide === 'left' ? 'left' : 'right'}` : mode;
+        modeChips.forEach(chip => chip.classList.toggle('active', chip.dataset.mode === current));
+    };
+    modeChips.forEach(chip => chip.addEventListener('click', () => {
+        const [mode, side] = chip.dataset.mode.split('-');
+        settings.inputButtonMode = mode;
+        settings.inputButton = mode !== 'off';
+        if (side) settings.floatSide = side;
+        saveSettings();
+        syncInputButton();
+        drawMode();
+    }));
+    drawMode();
 
     const keep = container.querySelector('.pbx-keep');
     const drawKeep = () => { keep.textContent = String(settings.foldKeep); };

@@ -125,6 +125,30 @@ function scheduleFold() {
     scheduled = setTimeout(applyFold, 80);
 }
 
+/**
+ * Only react to changes that can matter: a new/removed message or picture, or a picture's src.
+ * Streaming text (a text node per token) is ignored, so long chats stay smooth while replies arrive.
+ */
+function isRelevant(records) {
+    for (const record of records) {
+        if (record.type === 'attributes') {
+            if (record.target.tagName === 'IMG') return true;
+            continue;
+        }
+        for (const list of [record.addedNodes, record.removedNodes]) {
+            for (const node of list) {
+                if (node.nodeType !== 1) continue;
+                if (node.tagName === 'IMG' || node.classList?.contains('mes') || node.querySelector?.('img, .mes')) return true;
+            }
+        }
+    }
+    return false;
+}
+
+function onMutations(records) {
+    if (isRelevant(records)) scheduleFold();
+}
+
 function onToggle(event) {
     const toggle = event.target.closest?.('.pbx-fold-toggle');
     if (!toggle) return;
@@ -145,13 +169,17 @@ export function initFold() {
     const start = () => {
         const chat = document.getElementById('chat');
         if (chat && !observer) {
-            observer = new MutationObserver(scheduleFold);
+            observer = new MutationObserver(onMutations);
             observer.observe(chat, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
         }
         scheduleFold();
     };
     const { eventSource, eventTypes } = SillyTavern.getContext();
     eventSource.on(eventTypes.CHAT_CHANGED, () => { expanded.clear(); start(); });
+    // Safety net for renders that replace whole blocks.
+    for (const name of ['MESSAGE_RENDERED', 'CHARACTER_MESSAGE_RENDERED', 'USER_MESSAGE_RENDERED', 'MESSAGE_UPDATED', 'MESSAGE_SWIPED', 'MORE_MESSAGES_LOADED', 'GENERATION_ENDED']) {
+        if (eventTypes[name]) eventSource.on(eventTypes[name], scheduleFold);
+    }
     start();
 }
 

@@ -1,9 +1,10 @@
 // Thumbnail grid, image viewer, favorites and ZIP export shared by the gallery tabs.
-import { ctx, getSettings, saveSettings, copyText, downloadBlob, currentChatId, confirmPopup, escapeHtml, sniffExt } from './settings.js';
-import { getThumb } from './thumbs.js';
+import { ctx, getSettings, saveSettings, copyText, downloadBlob, currentChatId, confirmPopup, escapeHtml, sniffExt, postJson } from './settings.js';
+import { getThumb, forgetThumb } from './thumbs.js';
 import { buildZip, safeName } from './zip.js';
-import { itemTime } from './collect.js';
+import { itemTime, imageKey } from './collect.js';
 import { expandMessage } from './fold.js';
+import { openCard } from './card.js';
 
 // ---------- favorites ----------
 export function isFavorite(key) {
@@ -127,6 +128,92 @@ export function openFolderPicker(anchor, items, onChange) {
         document.removeEventListener('pointerdown', close, true);
     };
     setTimeout(() => document.addEventListener('pointerdown', close, true), 0);
+}
+
+// ---------- delete ----------
+const IMG_TAG = /<img\b[^>]*?\ssrc\s*=\s*["']([^"']+)["'][^>]*>/gi;
+
+/** Drop deleted images from the open chat so its messages do not keep broken pictures. */
+async function forgetInOpenChat(keys) {
+    const c = ctx();
+    const chat = c.chat || [];
+    const gone = src => keys.has(imageKey(String(src || '').replace(/&amp;/g, '&')));
+    const changedIds = [];
+    chat.forEach((message, mesId) => {
+        if (!message || typeof message !== 'object') return;
+        let changed = false;
+        const extras = [message.extra, ...(message.swipe_info || []).map(info => info?.extra)].filter(Boolean);
+        for (const extra of extras) {
+            if (Array.isArray(extra.media)) {
+                const kept = extra.media.filter(m => !gone(m?.url));
+                if (kept.length !== extra.media.length) {
+                    extra.media = kept;
+                    if (Number.isInteger(extra.media_index)) extra.media_index = Math.max(0, Math.min(extra.media_index, kept.length - 1));
+                    changed = true;
+                }
+            }
+            for (const key of Object.keys(extra.autopic_images || {})) {
+                if (keys.has(key)) { delete extra.autopic_images[key]; changed = true; }
+            }
+        }
+        const strip = text => typeof text === 'string' && text.includes('<img')
+            ? text.replace(IMG_TAG, (tag, src) => (gone(src) ? '' : tag)) : text;
+        const mes = strip(message.mes);
+        if (mes !== message.mes) { message.mes = mes; changed = true; }
+        if (Array.isArray(message.swipes)) {
+            const swipes = message.swipes.map(strip);
+            if (swipes.some((t, i) => t !== message.swipes[i])) { message.swipes = swipes; changed = true; }
+        }
+        if (changed) changedIds.push(mesId);
+    });
+    if (!changedIds.length) return;
+    for (const mesId of changedIds) {
+        try {
+            c.updateMessageBlock(mesId, chat[mesId]);
+            const element = $(`#chat .mes[mesid="${mesId}"]`);
+            element.find('.mes_media_wrapper').empty();
+            c.appendMediaToMessage(chat[mesId], element);
+        } catch { /* message not rendered */ }
+    }
+    await c.saveChat();
+}
+
+/**
+ * Permanently delete image files (and their favorites / previews).
+ * @returns {Promise<Set<string>>} keys that are gone
+ */
+export async function deleteItems(items) {
+    if (!items.length) return new Set();
+    const inOpenChat = items.some(item => item.isCurrent);
+    const ok = await confirmPopup(`<p>그림 <b>${items.length}장</b>을 폴더에서 <b>영구 삭제</b>할까요?</p>
+        <p>되돌릴 수 없어요.</p>
+        <small>${inOpenChat ? '지금 채팅에 붙은 그림은 채팅에서도 같이 빠져요. ' : ''}다른 채팅에 붙어 있던 그림은 그 채팅에서 깨진 그림으로 보일 수 있어요.</small>`);
+    if (!ok) return new Set();
+    const removed = new Set();
+    let failed = 0;
+    for (const item of items) {
+        try {
+            const response = await fetch('/api/images/delete', {
+                method: 'POST',
+                headers: ctx().getRequestHeaders(),
+                body: JSON.stringify({ path: `user/images/${item.folder}/${item.file}` }),
+            });
+            // 404: already gone, which is what the user wanted.
+            if (!response.ok && response.status !== 404) throw new Error(String(response.status));
+            removed.add(item.key);
+            if (isFavorite(item.key)) setFavorite(item, false, false);
+            forgetThumb(item.url);
+        } catch {
+            failed++;
+        }
+    }
+    if (removed.size) {
+        saveSettings();
+        try { await forgetInOpenChat(removed); } catch { /* the files are deleted either way */ }
+        toastr.success(`${removed.size}장을 삭제했어요.`);
+    }
+    if (failed) toastr.error(`${failed}장은 삭제하지 못했어요.`);
+    return removed;
 }
 
 // ---------- background ----------
@@ -361,8 +448,10 @@ export function openViewer(items, startIndex, options) {
                 <button class="pbx-btn pbx-icon pbx-folderbtn" title="즐겨찾기 폴더"><i class="fa-solid fa-folder-plus"></i></button>
                 <button class="pbx-btn pbx-icon pbx-copy" title="프롬프트 복사"><i class="fa-solid fa-copy"></i></button>
                 <button class="pbx-btn pbx-icon pbx-down" title="다운로드"><i class="fa-solid fa-download"></i></button>
+                <button class="pbx-btn pbx-icon pbx-cardbtn" title="대사 카드 만들기"><i class="fa-solid fa-quote-left"></i></button>
                 <button class="pbx-btn pbx-icon pbx-bg" title="배경으로 설정"><i class="fa-solid fa-panorama"></i></button>
                 <button class="pbx-btn pbx-icon pbx-jump" title="메시지로 이동"><i class="fa-solid fa-location-arrow"></i></button>
+                <button class="pbx-btn pbx-icon pbx-danger pbx-del" title="삭제"><i class="fa-solid fa-trash"></i></button>
                 <button class="pbx-btn pbx-icon pbx-close" title="닫기"><i class="fa-solid fa-xmark"></i></button>
             </div>
         </div>
@@ -426,6 +515,16 @@ export function openViewer(items, startIndex, options) {
         openFolderPicker(event.currentTarget, [items[index]], () => { show(); options.onChange?.(); });
     });
     $('.pbx-bg').addEventListener('click', () => setAsBackground(items[index]));
+    $('.pbx-cardbtn').addEventListener('click', () => openCard(items[index]));
+    $('.pbx-del').addEventListener('click', async () => {
+        const removed = await deleteItems([items[index]]);
+        if (!removed.size) return;
+        items.splice(index, 1);
+        options.onDelete?.(removed);
+        if (!items.length) { close(); return; }
+        index = Math.min(index, items.length - 1);
+        show();
+    });
     $('.pbx-jump').addEventListener('click', () => jumpTo(items[index], () => { close(); options.closeAll(); }));
 
     // Swipe left / right on touch screens.

@@ -1,7 +1,7 @@
 /* PicBox — every control uses its own classes so themes that restyle
    .menu_button / .text_pole cannot squash or wrap them. Theme colors are still used. */
 
-#pbx_overlay, #pbx_viewer, #pbx_settings {
+#pbx_overlay, #pbx_viewer, #pbx_settings, #pbx_draw, #pbx_card {
     --pbx-fg: var(--SmartThemeBodyColor, #ddd);
     --pbx-bg: var(--SmartThemeBlurTintColor, #1e1e1e);
     --pbx-line: var(--SmartThemeBorderColor, rgba(127, 127, 127, 0.35));
@@ -11,7 +11,7 @@
 }
 
 /* `all: unset` on our controls would otherwise defeat the hidden attribute. */
-#pbx_overlay [hidden], #pbx_viewer [hidden], #pbx_settings [hidden] { display: none !important; }
+#pbx_overlay [hidden], #pbx_viewer [hidden], #pbx_settings [hidden], #pbx_draw [hidden], #pbx_card [hidden] { display: none !important; }
 
 /* ---------- chat folding ---------- */
 .mes.pbx-folded .mes_media_wrapper,
@@ -21,7 +21,7 @@
     display: none !important;
 }
 
-.pbx-fold-toggle {
+.pbx-fold-toggle, .pbx-retry {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -37,7 +37,16 @@
     cursor: pointer;
     user-select: none;
 }
-.pbx-fold-toggle:hover { opacity: 1; }
+.pbx-fold-toggle:hover, .pbx-retry:hover { opacity: 1; }
+.pbx-retry { border-color: var(--SmartThemeQuoteColor, #e18a24); }
+
+/* Long press opens the PicBox viewer instead of the phone's image menu. */
+body.pbx-longpress #chat .mes .mes_media_wrapper img,
+body.pbx-longpress #chat .mes .mes_text img {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
 
 /* ---------- shared controls ---------- */
 .pbx-btn {
@@ -296,6 +305,7 @@
 
 /* ---------- search, chips, toggles ---------- */
 .pbx-btn.pbx-on { border-color: var(--pbx-accent); color: var(--pbx-accent); }
+.pbx-btn.pbx-primary { background: var(--pbx-accent); border-color: var(--pbx-accent); color: #fff; }
 
 .pbx-input {
     all: unset;
@@ -457,6 +467,130 @@
 .pbx-stepper { display: inline-flex; align-items: center; gap: 8px; }
 .pbx-stepper b { min-width: 24px; text-align: center; font-size: 15px; }
 
+/* ---------- floating 📷 button ---------- */
+#pbx_float_btn {
+    position: fixed;
+    /* left/top are set by script to sit inside the chat column above the input bar */
+    top: auto;
+    left: auto;
+    z-index: 3000;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    cursor: pointer;
+    color: #fff;
+    background: var(--SmartThemeQuoteColor, #e18a24);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+    opacity: 0.9;
+    user-select: none;
+}
+#pbx_float_btn:hover { opacity: 1; }
+#pbx_float_btn.pbx-busy { animation: pbx-pulse 1.2s ease-in-out infinite; }
+@keyframes pbx-pulse { 50% { transform: scale(0.9); opacity: 0.6; } }
+.pbx-btnmode { flex-wrap: wrap; justify-content: flex-end; }
+
+/* ---------- draw window ---------- */
+#pbx_draw {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.pbx-draw-panel {
+    width: min(620px, 94vw);
+    max-height: 90vh;
+    max-height: 90dvh;
+    display: flex;
+    flex-direction: column;
+    background: var(--pbx-bg);
+    color: var(--pbx-fg);
+    border: 1px solid var(--pbx-line);
+    border-radius: 14px;
+    overflow: hidden;
+    backdrop-filter: blur(var(--SmartThemeBlurStrength, 10px));
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+}
+.pbx-draw-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+.pbx-area {
+    all: unset;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--pbx-line);
+    background: var(--pbx-soft);
+    color: var(--pbx-fg);
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    resize: vertical;
+}
+.pbx-block { font-size: 12px; font-family: ui-monospace, monospace; margin-top: 6px; }
+.pbx-draw-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pbx-mode-note, .pbx-refs { font-size: 12px; opacity: 0.65; }
+.pbx-block-box summary { cursor: pointer; font-size: 12px; opacity: 0.8; }
+.pbx-draw-result img { width: 100%; border-radius: 10px; display: block; margin-bottom: 8px; }
+.pbx-draw-status:empty { display: none; }
+
+/* ---------- quote card ---------- */
+#pbx_card {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 10003;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.pbx-card-panel {
+    width: min(980px, 96vw);
+    max-height: 92vh;
+    max-height: 92dvh;
+    display: flex;
+    flex-direction: column;
+    background: var(--pbx-bg);
+    color: var(--pbx-fg);
+    border: 1px solid var(--pbx-line);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+}
+.pbx-card-body { display: flex; gap: 16px; padding: 14px; overflow-y: auto; }
+.pbx-card-preview { flex: 1.2; display: flex; align-items: flex-start; justify-content: center; min-width: 0; }
+.pbx-card-preview canvas { max-width: 100%; max-height: 74vh; height: auto; border-radius: 8px; box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25); }
+.pbx-card-controls { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.pbx-card-label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; opacity: 0.85; }
+.pbx-card-section { margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--pbx-line); font-size: 12px; font-weight: 600; opacity: 0.75; }
+.pbx-card-controls .pbx-select { max-width: none; width: 100%; font-size: 15px; }
+.pbx-card-controls .pbx-opt-row { flex-wrap: wrap; row-gap: 6px; }
+.pbx-colors { justify-content: flex-start !important; gap: 12px; font-size: 12px; }
+.pbx-colors label { display: inline-flex; align-items: center; gap: 6px; }
+.pbx-colors input[type="color"] {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid var(--pbx-line);
+    border-radius: 8px;
+    background: none;
+    cursor: pointer;
+}
+.pbx-colors .pbx-btn { margin-left: auto; }
+
 /* ---------- phones ---------- */
 @media (max-width: 768px) {
     #pbx_overlay .pbx-panel { width: 100vw; height: 100vh; height: 100dvh; border-radius: 0; border: none; }
@@ -483,4 +617,8 @@
     .pbx-stat-num { grid-column: 1; grid-row: 3; }
     .pbx-stat-actions { grid-column: 2; grid-row: 1; }
     .pbx-story-text { font-size: 13.5px; }
+    .pbx-card-panel { width: 100vw; max-height: 100dvh; height: 100dvh; border-radius: 0; border: none; }
+    .pbx-card-body { flex-direction: column; }
+    .pbx-card-preview canvas { max-height: 46vh; }
+    .pbx-draw-panel { width: 100vw; max-height: 100dvh; height: 100dvh; border-radius: 0; border: none; }
 }
