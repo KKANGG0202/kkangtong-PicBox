@@ -30,7 +30,7 @@ export function renderOptions(container) {
             </section>
             <section>
                 <h4><i class="fa-solid fa-palette"></i> 픽박스로 그리기</h4>
-                <div class="pbx-opt-row"><span>📷 버튼</span>
+                <div class="pbx-opt-stack"><span>📷 버튼 위치</span>
                     <span class="pbx-chips pbx-btnmode">
                         <button class="pbx-chip" data-mode="input">입력창</button>
                         <button class="pbx-chip" data-mode="float-left">플로팅 왼쪽</button>

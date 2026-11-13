@@ -491,7 +491,13 @@ body.pbx-longpress #chat .mes .mes_text img {
 #pbx_float_btn:hover { opacity: 1; }
 #pbx_float_btn.pbx-busy { animation: pbx-pulse 1.2s ease-in-out infinite; }
 @keyframes pbx-pulse { 50% { transform: scale(0.9); opacity: 0.6; } }
-.pbx-btnmode { flex-wrap: wrap; justify-content: flex-end; }
+.pbx-opt-row > span:first-child { white-space: nowrap; }
+.pbx-opt-stack { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.pbx-btnmode { display: grid !important; grid-template-columns: repeat(4, 1fr); gap: 6px; overflow: visible; }
+.pbx-btnmode .pbx-chip { justify-content: center; padding: 0 6px; }
+@media (max-width: 560px) {
+    .pbx-btnmode { grid-template-columns: repeat(2, 1fr); }
+}
 
 /* ---------- draw window ---------- */
 #pbx_draw {
