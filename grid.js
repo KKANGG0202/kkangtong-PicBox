@@ -435,6 +435,113 @@ export async function jumpTo(item, closeAll) {
  * @param {number} startIndex
  * @param {{onChange?: () => void, closeAll: () => void}} options
  */
+/**
+ * Pinch / double-tap / wheel zoom and drag for the viewer image.
+ * Returns { reset, zoomed } — swiping to the next picture only happens while not zoomed.
+ */
+function attachZoom(stage, img) {
+    let scale = 1, tx = 0, ty = 0;
+    const MAX = 6;
+    const apply = () => {
+        img.style.transform = scale === 1 && !tx && !ty ? '' : `translate(${tx}px, ${ty}px) scale(${scale})`;
+        stage.classList.toggle('pbx-zoomed', scale > 1);
+    };
+    const clamp = () => {
+        const limX = Math.max(0, (img.offsetWidth * scale - stage.clientWidth) / 2);
+        const limY = Math.max(0, (img.offsetHeight * scale - stage.clientHeight) / 2);
+        tx = Math.min(limX, Math.max(-limX, tx));
+        ty = Math.min(limY, Math.max(-limY, ty));
+    };
+    /** Zoom to `next` keeping the stage point (x, y) under the finger / cursor. */
+    const zoomAt = (next, x, y) => {
+        next = Math.min(MAX, Math.max(1, next));
+        const rect = stage.getBoundingClientRect();
+        const cx = x - rect.left - rect.width / 2;
+        const cy = y - rect.top - rect.height / 2;
+        tx = cx - (cx - tx) * (next / scale);
+        ty = cy - (cy - ty) * (next / scale);
+        scale = next;
+        if (scale === 1) { tx = 0; ty = 0; }
+        clamp();
+        apply();
+    };
+    const reset = () => { scale = 1; tx = 0; ty = 0; apply(); };
+
+    // Touch: two fingers pinch, one finger drags while zoomed, double tap toggles.
+    let pinch = null, drag = null, lastTap = 0;
+    const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    stage.addEventListener('touchstart', event => {
+        if (event.target.closest('button')) return;
+        if (event.touches.length === 2) {
+            const [a, b] = event.touches;
+            pinch = { d: dist(a, b), scale };
+            drag = null;
+        } else if (event.touches.length === 1) {
+            const t = event.touches[0];
+            drag = { x: t.clientX, y: t.clientY, tx, ty };
+            const now = Date.now();
+            if (now - lastTap < 300) {
+                zoomAt(scale > 1 ? 1 : 2.5, t.clientX, t.clientY);
+                lastTap = 0;
+                drag = null;
+            } else lastTap = now;
+        }
+    }, { passive: true });
+    stage.addEventListener('touchmove', event => {
+        if (pinch && event.touches.length === 2) {
+            event.preventDefault();
+            const [a, b] = event.touches;
+            zoomAt(pinch.scale * (dist(a, b) / pinch.d), (a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
+        } else if (drag && scale > 1 && event.touches.length === 1) {
+            event.preventDefault();
+            const t = event.touches[0];
+            tx = drag.tx + (t.clientX - drag.x);
+            ty = drag.ty + (t.clientY - drag.y);
+            clamp();
+            apply();
+        }
+    }, { passive: false });
+    stage.addEventListener('touchend', event => {
+        if (event.touches.length < 2) pinch = null;
+        if (event.touches.length === 1 && scale > 1) {
+            // One finger left after a pinch: keep dragging from here.
+            const t = event.touches[0];
+            drag = { x: t.clientX, y: t.clientY, tx, ty };
+        } else if (!event.touches.length) drag = null;
+    });
+
+    // Mouse: wheel zooms, drag moves, double click toggles.
+    stage.addEventListener('wheel', event => {
+        event.preventDefault();
+        zoomAt(scale * (event.deltaY < 0 ? 1.2 : 1 / 1.2), event.clientX, event.clientY);
+    }, { passive: false });
+    stage.addEventListener('dblclick', event => {
+        if (event.target.closest('button')) return;
+        zoomAt(scale > 1 ? 1 : 2.5, event.clientX, event.clientY);
+    });
+    let mouse = null;
+    stage.addEventListener('mousedown', event => {
+        if (scale === 1 || event.button !== 0 || event.target.closest('button')) return;
+        event.preventDefault();
+        mouse = { x: event.clientX, y: event.clientY, tx, ty };
+    });
+    const onMouseMove = event => {
+        if (!mouse) return;
+        tx = mouse.tx + (event.clientX - mouse.x);
+        ty = mouse.ty + (event.clientY - mouse.y);
+        clamp();
+        apply();
+    };
+    const onMouseUp = () => { mouse = null; };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    const dispose = () => {
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+    };
+    return { reset, zoomed: () => scale > 1, dispose };
+}
+
 export function openViewer(items, startIndex, options) {
     document.getElementById('pbx_viewer')?.remove();
     let index = startIndex;
@@ -464,10 +571,12 @@ export function openViewer(items, startIndex, options) {
     document.body.appendChild(viewer);
 
     const $ = selector => viewer.querySelector(selector);
-    const close = () => { document.removeEventListener('keydown', onKey, true); viewer.remove(); };
+    const zoom = attachZoom($('.pbx-viewer-stage'), $('.pbx-viewer-img'));
+    const close = () => { document.removeEventListener('keydown', onKey, true); zoom.dispose(); viewer.remove(); };
 
     function show() {
         const item = items[index];
+        zoom.reset();
         $('.pbx-viewer-img').src = item.url;
         const where = Number.isInteger(item.mesId) ? `#${item.mesId}` : '';
         $('.pbx-viewer-info').innerHTML = `${index + 1} / ${items.length} ${escapeHtml(where)}<br><small>${escapeHtml(item.charName || '')}${item.isCurrent || !item.chatFile ? '' : ` · ${escapeHtml(item.chatFile)}`}</small>`;
@@ -529,9 +638,11 @@ export function openViewer(items, startIndex, options) {
 
     // Swipe left / right on touch screens.
     let touchX = null;
-    $('.pbx-viewer-stage').addEventListener('touchstart', event => { touchX = event.touches[0].clientX; }, { passive: true });
+    $('.pbx-viewer-stage').addEventListener('touchstart', event => {
+        touchX = event.touches.length === 1 && !zoom.zoomed() ? event.touches[0].clientX : null;
+    }, { passive: true });
     $('.pbx-viewer-stage').addEventListener('touchend', event => {
-        if (touchX === null) return;
+        if (touchX === null || zoom.zoomed() || event.touches.length) { touchX = null; return; }
         const dx = event.changedTouches[0].clientX - touchX;
         touchX = null;
         if (Math.abs(dx) > 50) move(dx < 0 ? 1 : -1);
