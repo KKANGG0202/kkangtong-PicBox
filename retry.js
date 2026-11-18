@@ -4,11 +4,51 @@ import { ctx } from './settings.js';
 import { generateImage, autopicSettings } from './autopic.js';
 import { imageKey, isUserImage } from './collect.js';
 
-// AutoPic may still be drawing the newest reply; give it time before offering a retry.
-const GRACE_MS = 2 * 60 * 1000;
+// AutoPic may still be drawing the newest reply. We watch its image requests so the button
+// appears as soon as it has finished (or failed), instead of waiting a fixed time.
+const GRACE_MS = 2 * 60 * 1000;     // only used for a reply that arrived before this page loaded
+const SETTLE_MS = 4000;             // quiet time after the reply / last image request
+const GENERATING_LIMIT_MS = 5 * 60 * 1000;
+const IMAGE_URL = /\/api\/plugins\/autopic\/|\/api\/sd\/|\/api\/novelai\/generate-image|\/api\/horde\/generate-image|\/api\/openai\/generate-image|\/api\/images\/upload/i;
 const BLOCK = /<autopic\b[\s\S]*?<\/autopic>|&lt;autopic\b[\s\S]*?&lt;\/autopic&gt;/i;
 const running = new Set();
 let scheduled = 0;
+let inflight = 0;
+let lastActivity = 0;   // last time an image request started or ended
+let lastReply = 0;      // last time the newest reply finished or was swiped
+let generatingSince = 0;
+
+function later() {
+    setTimeout(scheduleRetry, SETTLE_MS + 200);
+}
+
+function watchFetch() {
+    if (window.fetch?.pbxWatched) return;
+    const original = window.fetch;
+    const wrapped = function (input, init) {
+        const url = typeof input === 'string' ? input : (input?.url || String(input || ''));
+        const promise = original.call(window, input, init);
+        if (!IMAGE_URL.test(url)) return promise;
+        inflight++;
+        lastActivity = Date.now();
+        const done = () => { inflight = Math.max(0, inflight - 1); lastActivity = Date.now(); later(); };
+        promise.then(done, done);
+        scheduleRetry();
+        return promise;
+    };
+    wrapped.pbxWatched = true;
+    window.fetch = wrapped;
+}
+
+/** True while the newest reply may still be streaming or getting its picture. */
+function newestBusy(message) {
+    const now = Date.now();
+    if (generatingSince && now - generatingSince < GENERATING_LIMIT_MS) return true;
+    if (inflight > 0) return true;
+    if (now - Math.max(lastActivity, lastReply) < SETTLE_MS) return true;
+    if (!lastReply) return now - (Date.parse(message.send_date) || 0) < GRACE_MS;
+    return false;
+}
 
 function decode(text) {
     const area = document.createElement('textarea');
@@ -27,8 +67,7 @@ function needsRetry(message, mesId, chat) {
     const match = message.mes.match(BLOCK);
     if (!match) return null;
     if (hasPicture(message)) return null;
-    const age = Date.now() - (Date.parse(message.send_date) || 0);
-    if (mesId === chat.length - 1 && age < GRACE_MS) return null;
+    if (mesId === chat.length - 1 && newestBusy(message)) return null;
     return match[0];
 }
 
@@ -53,7 +92,7 @@ export function applyRetry() {
             button.tabIndex = 0;
             anchor.after(button);
         }
-        const text = running.has(mesId) ? '🎨 그리는 중…' : '🎨 그림이 안 그려졌어요 · 다시 그리기';
+        const text = running.has(mesId) ? '🎨 그리는 중…' : '🎨 그림이 안 그려졌어요 · 같은 태그로 다시 그리기';
         if (button.textContent !== text) button.textContent = text;
     }
 }
@@ -119,13 +158,27 @@ function onClick(event) {
 }
 
 export function initRetry() {
+    watchFetch();
     document.addEventListener('click', onClick, true);
     document.addEventListener('keydown', onClick, true);
     const { eventSource, eventTypes } = ctx();
     for (const name of ['CHAT_CHANGED', 'MESSAGE_RENDERED', 'CHARACTER_MESSAGE_RENDERED', 'MESSAGE_UPDATED', 'MESSAGE_SWIPED', 'MESSAGE_EDITED', 'MESSAGE_DELETED', 'MORE_MESSAGES_LOADED']) {
         if (eventTypes[name]) eventSource.on(eventTypes[name], scheduleRetry);
     }
-    // The newest reply only qualifies after the grace period.
-    setInterval(scheduleRetry, 30_000);
+    const replied = () => { generatingSince = 0; lastReply = Date.now(); scheduleRetry(); later(); };
+    if (eventTypes.GENERATION_STARTED) {
+        eventSource.on(eventTypes.GENERATION_STARTED, (_type, _options, dryRun) => {
+            if (dryRun) return;
+            generatingSince = Date.now();
+            scheduleRetry();
+        });
+    }
+    for (const name of ['MESSAGE_RECEIVED', 'GENERATION_ENDED', 'GENERATION_STOPPED']) {
+        if (eventTypes[name]) eventSource.on(eventTypes[name], replied);
+    }
+    if (eventTypes.MESSAGE_SWIPED) eventSource.on(eventTypes.MESSAGE_SWIPED, () => { lastReply = Date.now(); later(); });
+    if (eventTypes.CHAT_CHANGED) eventSource.on(eventTypes.CHAT_CHANGED, () => { generatingSince = 0; });
+    // Backup check in case an event is missed.
+    setInterval(scheduleRetry, 10_000);
     scheduleRetry();
 }
