@@ -567,7 +567,7 @@ export function openViewer(items, startIndex, options) {
             <img class="pbx-viewer-img" alt="">
             <button class="pbx-nav pbx-next" aria-label="다음"><i class="fa-solid fa-chevron-right"></i></button>
         </div>
-        <details class="pbx-prompt" open><summary>생성 프롬프트</summary><pre></pre></details>`;
+        <details class="pbx-prompt"><summary>생성 프롬프트</summary><pre></pre></details>`;
     document.body.appendChild(viewer);
 
     const $ = selector => viewer.querySelector(selector);
