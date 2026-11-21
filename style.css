@@ -531,6 +531,15 @@ body.pbx-longpress #chat .mes .mes_text img {
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
 }
 .pbx-draw-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+/* The body scrolls; its rows must keep their full height instead of being squeezed (chip rows were clipped). */
+.pbx-draw-body > * { flex-shrink: 0; }
+#pbx_draw .pbx-draw-body > .pbx-chips { flex: 0 0 auto !important; min-height: 28px !important; align-items: center; }
+.pbx-say { margin-bottom: 8px; min-height: 3.4em; }
+.pbx-refchips { align-items: center; }
+.pbx-refchips .pbx-refs { flex: 0 0 auto; white-space: nowrap; }
+.pbx-draw-busy .pbx-refchip { opacity: 0.4; cursor: default; }
+/* Once a picture is showing, the mode explanation gives its space to the picture (it stays as the chips' tooltip). */
+.pbx-draw-body:has(.pbx-draw-result:not([hidden])) .pbx-mode-note { display: none; }
 .pbx-area {
     all: unset;
     box-sizing: border-box;
@@ -549,8 +558,49 @@ body.pbx-longpress #chat .mes .mes_text img {
 .pbx-draw-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .pbx-mode-note, .pbx-refs { font-size: 12px; opacity: 0.65; }
 .pbx-block-box summary { cursor: pointer; font-size: 12px; opacity: 0.8; }
-.pbx-draw-result img { width: 100%; border-radius: 10px; display: block; margin-bottom: 8px; }
+.pbx-draw-result > img { width: 100%; border-radius: 10px; display: block; margin-bottom: 8px; }
 .pbx-draw-status:empty { display: none; }
+
+/* presets under the request box */
+.pbx-presets { flex-shrink: 0; }
+.pbx-preset { max-width: 160px; overflow: hidden; text-overflow: ellipsis; display: inline-block; line-height: 24px; -webkit-touch-callout: none; user-select: none; }
+.pbx-preset-add { border-style: dashed; }
+.pbx-draw-busy .pbx-presets .pbx-chip, .pbx-draw-busy .pbx-history-item { opacity: 0.4; cursor: default; }
+
+/* pictures drawn in this chat and not sent yet */
+.pbx-history { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; scrollbar-width: thin; }
+.pbx-history-item {
+    position: relative;
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    width: 64px;
+    height: 64px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 2px solid transparent;
+    opacity: 0.65;
+}
+.pbx-history-item:hover { opacity: 1; }
+.pbx-history-item.active { opacity: 1; border-color: var(--pbx-accent); }
+.pbx-draw-result .pbx-history-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 0; margin: 0; display: block; cursor: pointer; }
+.pbx-history-x {
+    all: unset;
+    box-sizing: border-box;
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0 0 0 8px;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+}
+.pbx-history-x:hover { background: #c0392b; }
 
 /* ---------- quote card ---------- */
 #pbx_card {

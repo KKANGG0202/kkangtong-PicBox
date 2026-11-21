@@ -5,6 +5,7 @@ import { buildZip, safeName } from './zip.js';
 import { itemTime, imageKey } from './collect.js';
 import { expandMessage } from './fold.js';
 import { openCard } from './card.js';
+import { openDraw } from './draw.js';
 
 // ---------- favorites ----------
 export function isFavorite(key) {
@@ -554,6 +555,7 @@ export function openViewer(items, startIndex, options) {
                 <button class="pbx-btn pbx-icon pbx-fav" title="즐겨찾기"></button>
                 <button class="pbx-btn pbx-icon pbx-folderbtn" title="즐겨찾기 폴더"><i class="fa-solid fa-folder-plus"></i></button>
                 <button class="pbx-btn pbx-icon pbx-copy" title="프롬프트 복사"><i class="fa-solid fa-copy"></i></button>
+                <button class="pbx-btn pbx-icon pbx-redraw" title="이 프롬프트로 그리기"><i class="fa-solid fa-paintbrush"></i></button>
                 <button class="pbx-btn pbx-icon pbx-down" title="다운로드"><i class="fa-solid fa-download"></i></button>
                 <button class="pbx-btn pbx-icon pbx-cardbtn" title="대사 카드 만들기"><i class="fa-solid fa-quote-left"></i></button>
                 <button class="pbx-btn pbx-icon pbx-bg" title="배경으로 설정"><i class="fa-solid fa-panorama"></i></button>
@@ -586,6 +588,7 @@ export function openViewer(items, startIndex, options) {
         $('.pbx-folderbtn').title = folders.length ? `폴더: ${folders.join(', ')}` : '즐겨찾기 폴더';
         $('.pbx-prompt pre').textContent = item.prompt || '(저장된 프롬프트가 없어요)';
         $('.pbx-copy').disabled = !item.prompt;
+        $('.pbx-redraw').disabled = !item.prompt;
         $('.pbx-jump').disabled = !Number.isInteger(item.mesId);
         $('.pbx-prev').style.visibility = index > 0 ? 'visible' : 'hidden';
         $('.pbx-next').style.visibility = index < items.length - 1 ? 'visible' : 'hidden';
@@ -624,6 +627,17 @@ export function openViewer(items, startIndex, options) {
         openFolderPicker(event.currentTarget, [items[index]], () => { show(); options.onChange?.(); });
     });
     $('.pbx-bg').addEventListener('click', () => setAsBackground(items[index]));
+    // Opens the drawing window with this picture's prompt filled in; nothing is drawn until the user asks.
+    $('.pbx-redraw').addEventListener('click', () => {
+        const prompt = String(items[index].prompt || '').trim();
+        if (!prompt) return;
+        const item = items[index];
+        // Pictures of the open chat can take the redraw back into their own message.
+        const origin = item.isCurrent && Number.isInteger(item.mesId) ? { key: item.key, mesId: item.mesId } : null;
+        close();
+        options.closeAll?.();
+        openDraw(prompt, { mode: 'tags', origin });
+    });
     $('.pbx-cardbtn').addEventListener('click', () => openCard(items[index]));
     $('.pbx-del').addEventListener('click', async () => {
         const removed = await deleteItems([items[index]]);

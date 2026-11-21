@@ -19,6 +19,7 @@ const defaultSettings = Object.freeze({
     photoNote: true,
     autoStripTags: false,
     storyLinesOnly: false,
+    drawPresets: [],
 });
 
 export function ctx() {
@@ -43,6 +44,7 @@ export function getSettings() {
     }
     if (!settings.favorites || typeof settings.favorites !== 'object') settings.favorites = {};
     if (!Array.isArray(settings.favFolders)) settings.favFolders = [];
+    if (!Array.isArray(settings.drawPresets)) settings.drawPresets = [];
     return settings;
 }
 
