@@ -1,7 +1,7 @@
 // "픽박스로 그리기": draw a picture from the user's own request with AutoPic's settings.
 import { ctx, currentCharacter, currentChatId, escapeHtml, getSettings, saveSettings, confirmPopup } from './settings.js';
 import { generateImage, asBlock, blockInstructions, characterLibrary } from './autopic.js';
-import { imageKey, findReferences } from './collect.js';
+import { imageKey, findReferences, refKey } from './collect.js';
 import { expandMessage } from './fold.js';
 import { forgetThumb } from './thumbs.js';
 
@@ -27,7 +27,7 @@ function validOrigin(origin) {
 function findOriginMessage(origin) {
     if (!validOrigin(origin)) return -1;
     const chat = ctx().chat || [];
-    const path = origin.key.replace(/^\/user\/images\//, '');
+    const path = refKey(origin.key.replace(/^\/user\/images\//, ''));
     const holds = message => !!message && findReferences(message).has(path);
     if (holds(chat[origin.mesId])) return origin.mesId;
     for (let i = chat.length - 1; i >= 0; i--) if (holds(chat[i])) return i;

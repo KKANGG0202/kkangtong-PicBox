@@ -176,14 +176,33 @@ export async function loadGroupChat(id) {
     return stripHeader(Array.isArray(data) ? data : []);
 }
 
-/** Every "/user/images/<folder>/<file>" reference inside any JSON-able value. */
+/** One spelling for comparing "<folder>/<file>" paths (Korean can be stored composed or decomposed). */
+export function refKey(path) {
+    return String(path).normalize('NFC');
+}
+
+// A reference ends at its media extension. Folder names may hold ' ( ) [ ] and spaces, so the
+// path is not cut at those; only characters a folder name can never contain end it early.
+const REF_BY_EXTENSION = /user\/images\/([^"\\<>\n]+?\.(?:png|jpe?g|webp|gif|avif|bmp|svg|mp4|webm|mov|mp3|wav|ogg))(?![A-Za-z0-9])/gi;
+// Fallback for any other file type: stop at the usual URL delimiters.
+const REF_LOOSE = /user\/images\/([^"'\\<>)\]]+)/g;
+
+/** Every "<folder>/<file>" under user/images referenced inside any JSON-able value. */
 export function findReferences(value, into = new Set()) {
     const text = typeof value === 'string' ? value : JSON.stringify(value);
-    for (const match of text.matchAll(/user\/images\/([^"'\\<>)\]]+)/g)) {
-        let path = match[1];
-        try { path = decodeURIComponent(path); } catch { /* keep raw */ }
-        into.add(path.split(/[?#]/)[0].trim());
-    }
+    if (!text || !text.includes('user/images/')) return into;
+    const add = raw => {
+        const path = raw.split(/[?#]/)[0].trim();
+        if (!path) return;
+        // The same path can be written raw, URL-encoded, or with HTML entities; keep every reading.
+        const readings = new Set([path, decodeEntities(path)]);
+        for (const reading of [...readings]) {
+            try { readings.add(decodeURIComponent(reading)); } catch { /* a literal % in the name */ }
+        }
+        for (const reading of readings) into.add(refKey(reading));
+    };
+    for (const match of text.matchAll(REF_BY_EXTENSION)) add(match[1]);
+    for (const match of text.matchAll(REF_LOOSE)) add(match[1]);
     return into;
 }
 

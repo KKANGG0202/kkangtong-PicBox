@@ -67,7 +67,17 @@ function characterOptions() {
         .map(([name, cards]) => {
             const n = imageCount(name);
             const copies = cards.length > 1 ? ` (카드 ${cards.length}개)` : '';
-            return { avatar: name, name, count: n, label: `${name}${n ? ` · ${n}장` : ''}${copies}` };
+            // n counts the files in the folder. Once this character's chats are loaded we know how
+            // many are really attached; the rest (e.g. from deleted chats) are leftovers.
+            const loaded = charCache.get(name);
+            let pictures = n ? ` · ${n}장` : '';
+            if (loaded) {
+                const folder = sanitizeLikeServer(name);
+                const attachedHere = loaded.filter(item => item.folder === folder || item.folder === name).length;
+                const leftover = Math.max(0, n - attachedHere);
+                pictures = ` · ${loaded.length}장${leftover ? ` (안 붙은 그림 ${leftover}장)` : ''}`;
+            }
+            return { avatar: name, name, count: n, label: `${name}${pictures}${copies}` };
         })
         .sort((a, b) => (b.avatar === current) - (a.avatar === current) || a.name.localeCompare(b.name));
 }

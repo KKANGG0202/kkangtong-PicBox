@@ -1,6 +1,6 @@
 // Find images in a user/images folder that no chat references, and delete the chosen ones.
 import { ctx, postJson, confirmPopup, escapeHtml, currentCharacter } from './settings.js';
-import { listCharacterChats, loadCharacterChat, loadGroupChat, findReferences } from './collect.js';
+import { listCharacterChats, loadCharacterChat, loadGroupChat, findReferences, refKey } from './collect.js';
 import { renderGrid, exportItems, openViewer, setFavorite, isFavorite } from './grid.js';
 import { forgetThumb } from './thumbs.js';
 
@@ -161,7 +161,7 @@ export function renderCleanup(body, host, { folder: preferredFolder = '' } = {})
             if (!result) return;
             const now = Date.now();
             orphans = files
-                .filter(file => !result.refs.has(`${folder}/${file}`))
+                .filter(file => !result.refs.has(refKey(`${folder}/${file}`)))
                 .filter(file => !(fileTime(file) && now - fileTime(file) < RECENT_MS))
                 .map(file => {
                     const key = `/user/images/${folder}/${file}`;
