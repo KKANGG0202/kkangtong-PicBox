@@ -190,6 +190,8 @@ body.pbx-longpress #chat .mes .mes_text img {
     min-height: 0;
 }
 .pbx-toolbar[hidden] { display: none; }
+.pbx-leftover { white-space: nowrap; }
+.pbx-leftover b { font-weight: 600; }
 .pbx-spacer { flex: 1; }
 .pbx-count { font-size: 12px; opacity: 0.75; white-space: nowrap; }
 
@@ -666,6 +668,8 @@ body.pbx-longpress #chat .mes .mes_text img {
     .pbx-toolbar { flex-wrap: nowrap; }
     .pbx-toolbar .pbx-select { flex: 1 1 0; min-width: 0; max-width: none; }
     .pbx-toolbar .pbx-select + .pbx-spacer { display: none; }
+    .pbx-toolbar .pbx-leftover + .pbx-spacer { display: none; }
+    .pbx-toolbar .pbx-btn.pbx-leftover { width: auto; padding: 0 8px; flex: 0 0 auto; }
     .pbx-tabs { justify-content: space-between; }
     .pbx-tab { flex: 1 1 0; justify-content: center; padding: 0 4px; gap: 4px; min-width: 0; }
     .pbx-tab i { display: none; }

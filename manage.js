@@ -51,10 +51,10 @@ function folderOptions(folders, selected) {
  * @param {HTMLElement} body
  * @param {{closeAll: () => void, setToolbar: (html: string, bind?: (root: HTMLElement) => void) => void}} host
  */
-export function renderManage(body, host, startSub = 'stats') {
+export function renderManage(body, host, startSub = 'stats', startFolder = '') {
     let sub = startSub;
     let disposeSub = () => {};
-    let preferredFolder = currentCharacter() ? sanitizeLikeServer(currentCharacter().name) : '';
+    let preferredFolder = startFolder || (currentCharacter() ? sanitizeLikeServer(currentCharacter().name) : '');
 
     body.innerHTML = `
         <div class="pbx-manage">

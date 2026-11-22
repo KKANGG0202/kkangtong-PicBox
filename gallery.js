@@ -67,17 +67,11 @@ function characterOptions() {
         .map(([name, cards]) => {
             const n = imageCount(name);
             const copies = cards.length > 1 ? ` (카드 ${cards.length}개)` : '';
-            // n counts the files in the folder. Once this character's chats are loaded we know how
-            // many are really attached; the rest (e.g. from deleted chats) are leftovers.
+            // n counts the files in the folder. Once this character's chats are loaded the label
+            // shows what the gallery shows; leftovers get their own button (see leftoverFor).
             const loaded = charCache.get(name);
-            let pictures = n ? ` · ${n}장` : '';
-            if (loaded) {
-                const folder = sanitizeLikeServer(name);
-                const attachedHere = loaded.filter(item => item.folder === folder || item.folder === name).length;
-                const leftover = Math.max(0, n - attachedHere);
-                pictures = ` · ${loaded.length}장${leftover ? ` (안 붙은 그림 ${leftover}장)` : ''}`;
-            }
-            return { avatar: name, name, count: n, label: `${name}${pictures}${copies}` };
+            const shown = loaded ? loaded.length : n;
+            return { avatar: name, name, count: n, label: `${name}${shown ? ` · ${shown}장` : ''}${copies}` };
         })
         .sort((a, b) => (b.avatar === current) - (a.avatar === current) || a.name.localeCompare(b.name));
 }
@@ -225,6 +219,35 @@ function drawChips() {
 }
 
 /** Left side of the toolbar: the character picker on the per-character tab. */
+/**
+ * Files in the character's folder that no loaded chat of that character shows
+ * (deleted chats, pictures drawn but never attached). Known only after its chats are loaded.
+ */
+function leftoverFor(name) {
+    const loaded = charCache.get(name);
+    if (!loaded || !folderCounts) return { count: 0, folder: '' };
+    const sanitized = sanitizeLikeServer(name);
+    const folder = folderCounts.has(sanitized) ? sanitized : name;
+    const inFolder = folderCounts.get(folder) || 0;
+    const attachedHere = loaded.filter(item => item.folder === folder).length;
+    return { count: Math.max(0, inFolder - attachedHere), folder };
+}
+
+function leftoverHtml() {
+    if (state.tab !== 'char') return '';
+    const { count } = leftoverFor(state.charAvatar);
+    if (!count) return '';
+    return `<button class="pbx-btn pbx-leftover" title="폴더에는 있지만 이 캐릭터의 어느 채팅에도 붙어 있지 않은 그림이에요. 눌러서 확인하고 정리할 수 있어요."><i class="fa-solid fa-broom"></i><span>채팅에 없는 그림&nbsp;</span><b>${count}장</b></button>`;
+}
+
+function bindLeftover(bar) {
+    bar.querySelector('.pbx-leftover')?.addEventListener('click', () => {
+        const { folder } = leftoverFor(state.charAvatar);
+        state.manageStart = { sub: 'clean', folder };
+        switchTab('manage');
+    });
+}
+
 function pickerHtml() {
     if (state.tab !== 'char') return '';
     const options = characterOptions()
@@ -312,12 +335,14 @@ function drawToolbar() {
         const story = state.view === 'story';
         setToolbar(`
             ${pickerHtml()}
+            ${leftoverHtml()}
             <span class="pbx-spacer"></span>
             ${isFolder ? '<button title="폴더 삭제" class="pbx-btn pbx-danger pbx-delfolder"><i class="fa-solid fa-folder-minus"></i><span>폴더 삭제</span></button>' : ''}
             <button title="${story ? '격자로 보기' : '스토리로 보기'}" class="pbx-btn pbx-view ${story ? 'pbx-on' : ''}"><i class="fa-solid ${story ? 'fa-grip' : 'fa-book-open'}"></i><span>${story ? '격자' : '스토리'}</span></button>
             <button title="선택" class="pbx-btn pbx-sel" ${n && !story ? '' : 'disabled'}><i class="fa-solid fa-square-check"></i><span>선택</span></button>
             <button title="전체 ZIP" class="pbx-btn pbx-zip" ${n ? '' : 'disabled'}><i class="fa-solid fa-file-zipper"></i><span>전체 ZIP</span></button>`, bar => {
             bindPicker(bar);
+            bindLeftover(bar);
             bar.querySelector('.pbx-view').addEventListener('click', () => { state.view = story ? 'grid' : 'story'; drawItems(); });
             bar.querySelector('.pbx-sel').addEventListener('click', () => { state.selectMode = true; state.selected.clear(); drawItems(); });
             bar.querySelector('.pbx-zip').addEventListener('click', () => exportItems(state.items, label));
@@ -411,7 +436,11 @@ async function switchTab(tab, keepView = false) {
     showSubbar(tab !== 'manage');
 
     if (tab === 'manage') {
-        state.dispose = renderManage($('.pbx-body'), { closeAll: closeGallery, setToolbar });
+        const start = state.manageStart || {};
+        state.manageStart = null;
+        // Cleanup and shrinking change what is in the folders; count again when a picture tab is next opened.
+        folderCounts = null;
+        state.dispose = renderManage($('.pbx-body'), { closeAll: closeGallery, setToolbar }, start.sub || 'stats', start.folder || '');
         return;
     }
     if (tab === 'chat') {
