@@ -40,6 +40,8 @@ export function renderOptions(container) {
                 </div>
                 <label class="pbx-check-label"><input type="checkbox" data-key="photoNote"><span>내가 보낸 사진 내용을 AI에게 알려주기</span></label>
                 <small>"내 메시지로 보내기"를 할 때, 요청 내용과 장면·포즈·옷 같은 디테일을 화면에 안 보이는 메모로 같이 보내요. 외모 태그는 넣지 않아요.</small>
+                <label class="pbx-check-label"><input type="checkbox" data-key="sentNote"><span>캐릭터가 톡으로 보낸 사진 내용도 AI에게 알려주기</span></label>
+                <small>톡톡톡 스크립트로 톡하는 중에 오토픽이 붙인 사진만요. 채팅 기록은 안 바꾸고, AI에게 보낼 때만 사진에 보이는 것들을 메모로 붙여요. 일반 장면 삽화는 그대로 둬요.</small>
                 <label class="pbx-check-label"><input type="checkbox" data-key="drawAutoDelete"><span>채팅에 안 붙인 그림은 창 닫을 때 지우기</span></label>
                 <small>꺼두면(기본) 그린 그림은 전부 폴더에 남아요. 채팅에 안 붙인 그림은 "관리 → 안 쓰는 그림"에서 볼 수 있어요.</small>
             </section>

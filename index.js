@@ -8,6 +8,7 @@ import { openGallery } from './gallery.js';
 import { openDraw } from './draw.js';
 import { syncInputButton } from './inputbutton.js';
 import { initStrip } from './strip.js';
+import './sentnote.js';   // registers picboxInterceptor (manifest generate_interceptor)
 
 function closeWandMenu() {
     document.getElementById('extensionsMenu')?.classList.remove('openDrawer');

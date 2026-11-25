@@ -17,6 +17,7 @@ const defaultSettings = Object.freeze({
     inputButton: false,   // the 📷 button starts off (no input-bar or floating button); the wand menu always has 픽박스로 그리기
     floatSide: 'right',
     photoNote: true,
+    sentNote: true,       // a photo the character texted to the user (AutoPic, in a 톡톡톡 texting reply): the AI is told what it shows
     autoStripTags: false,
     storyLinesOnly: false,
     drawPresets: [],

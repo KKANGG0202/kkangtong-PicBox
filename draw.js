@@ -181,7 +181,7 @@ function plainTag(tag) {
 }
 
 /** What can be seen in the photo, in plain words: the scene, then each person in it (looks and quality words left out). */
-function visibleWords(block) {
+export function visibleWords(block) {
     const text = String(block || '');
     const words = list => detailTags(list.split(',').map(plainTag).filter(t => t && !STYLE.test(t)).join(','));
     const parts = [];
