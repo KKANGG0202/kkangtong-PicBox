@@ -172,22 +172,45 @@ function detailTags(tags) {
     return tags.split(',').map(t => t.trim()).filter(t => t && (KEEP.test(t) || !LOOKS.test(t)));
 }
 
+// Picture-quality and style words say nothing about what is in the photo.
+const STYLE = /^(?:masterpiece|best quality|high quality|amazing quality|good quality|normal quality|very aesthetic|aesthetic|absurdres|highres|incredibly absurdres|ultra[- ]detailed|very detailed|detailed|newest|official art|illustration|anime(?: style| coloring)?|realistic|photorealistic|score_\d+(?:_up)?|rating[:_ ]\w+|year \d+|artist:.*|\d+::.*|no text|watermark)$/i;
+
+/** One tag as plain words: no weights, brackets or underscores. */
+function plainTag(tag) {
+    return String(tag || '').replace(/^-?\d+(?:\.\d+)?::|::$/g, '').replace(/[{}[\]()]/g, '').replace(/:\s*-?\d+(?:\.\d+)?$/, '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/** What can be seen in the photo, in plain words: the scene, then each person in it (looks and quality words left out). */
+function visibleWords(block) {
+    const text = String(block || '');
+    const words = list => detailTags(list.split(',').map(plainTag).filter(t => t && !STYLE.test(t)).join(','));
+    const parts = [];
+    const scene = words((text.match(/<scene>([\s\S]*?)<\/scene>/i) || [])[1] || '');
+    if (scene.length) parts.push(scene.slice(0, 12).join(', '));
+    for (const m of text.matchAll(/<apchar(?:\s+ref\s*=\s*"([^"]*)")?[^>]*>([\s\S]*?)<\/apchar>/gi)) {
+        const who = words(m[2]);
+        if (who.length) parts.push(`${m[1] ? `${m[1]}: ` : ''}${who.slice(0, 14).join(', ')}`);
+    }
+    if (!parts.length && !/<scene>|<apchar/i.test(text)) {   // plain tags, not an <autopic> block
+        const plain = words(text);
+        if (plain.length) parts.push(plain.slice(0, 14).join(', '));
+    }
+    return parts.join('; ').replace(/--/g, '-');
+}
+
 /**
  * Note telling the AI what the photo shows (hidden in the chat view, read as text by the AI).
- * Inline images are not sent, so it says in plain words what the photo is. It carries no tag lists:
- * the AI copied those into its next picture, so the same photo came back instead of the new scene.
- * It also says the photo is already in the chat and is not to be drawn again.
+ * Inline images are not sent, so it says in plain words what the photo is and what can be seen in it
+ * (outfit, pose, framing, what is showing), so the AI can react to it. Quality words and permanent looks
+ * are left out, and the note says the photo is already in the chat and is not to be drawn again —
+ * an earlier note that carried the raw tag list got copied into the next picture.
  */
 function photoNote(request, block) {
     const name = String(ctx().name1 || 'User');
     const clean = value => String(value || '').replace(/--/g, '-').replace(/\s+/g, ' ').trim();
-    let what = clean(request);
-    if (!what) {
-        // No words from the user (tag mode): a few scene words, so the AI still knows roughly what it is.
-        const scene = detailTags(clean((String(block || '').match(/<scene>([\s\S]*?)<\/scene>/i) || [])[1]));
-        what = scene.slice(0, 6).join(', ');
-    }
-    return `<!-- ${name} sent a photo${what ? `: ${what}` : ''}. It is already in the chat as ${name}'s photo; it is not a new scene, so never draw it again or reuse it for a new picture. -->`;
+    const what = clean(request);
+    const seen = visibleWords(block);
+    return `<!-- ${name} sent a photo${what ? `: ${what}` : ''}.${seen ? ` What can be seen in it: ${seen}.` : ''} It is already in the chat as ${name}'s photo; it is not a new scene, so never draw it again or reuse it for a new picture. -->`;
 }
 
 /**
