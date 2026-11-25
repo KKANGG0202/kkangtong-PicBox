@@ -174,26 +174,20 @@ function detailTags(tags) {
 
 /**
  * Note telling the AI what the photo shows (hidden in the chat view, read as text by the AI).
- * Inline images are not sent, so it carries the user's request, the scene tags and the
- * per-character details (pose, expression, clothing...). Looks and negative tags are left out.
+ * Inline images are not sent, so it says in plain words what the photo is. It carries no tag lists:
+ * the AI copied those into its next picture, so the same photo came back instead of the new scene.
+ * It also says the photo is already in the chat and is not to be drawn again.
  */
 function photoNote(request, block) {
     const name = String(ctx().name1 || 'User');
-    const text = String(block || '');
     const clean = value => String(value || '').replace(/--/g, '-').replace(/\s+/g, ' ').trim();
-    const scene = detailTags(clean((text.match(/<scene>([\s\S]*?)<\/scene>/i) || [])[1])).join(', ');
-    const people = [...text.matchAll(/<apchar\b([^>]*)>([\s\S]*?)<\/apchar>/gi)]
-        .map(m => {
-            const ref = (m[1].match(/(?:ref|name)\s*=\s*["']([^"']*)["']/i) || [])[1];
-            const tags = detailTags(clean(m[2])).join(', ');
-            return tags ? `${ref ? `${clean(ref)}: ` : ''}${tags}` : '';
-        })
-        .filter(Boolean);
-    const parts = [];
-    if (clean(request)) parts.push(`Request: ${clean(request)}`);
-    if (scene) parts.push(`Scene: ${scene}`);
-    if (people.length) parts.push(`Details: ${people.join(' / ')}`);
-    return `<!-- ${name} sent a photo.${parts.length ? ` ${parts.join(' | ')}` : ''} -->`;
+    let what = clean(request);
+    if (!what) {
+        // No words from the user (tag mode): a few scene words, so the AI still knows roughly what it is.
+        const scene = detailTags(clean((String(block || '').match(/<scene>([\s\S]*?)<\/scene>/i) || [])[1]));
+        what = scene.slice(0, 6).join(', ');
+    }
+    return `<!-- ${name} sent a photo${what ? `: ${what}` : ''}. It is already in the chat as ${name}'s photo; it is not a new scene, so never draw it again or reuse it for a new picture. -->`;
 }
 
 /**

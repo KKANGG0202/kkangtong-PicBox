@@ -14,7 +14,7 @@ const defaultSettings = Object.freeze({
     webpBackup: true,
     longPressViewer: true,
     drawAutoDelete: false,
-    inputButton: true,
+    inputButton: false,   // the 📷 button starts off (no input-bar or floating button); the wand menu always has 픽박스로 그리기
     floatSide: 'right',
     photoNote: true,
     autoStripTags: false,
