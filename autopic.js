@@ -113,14 +113,38 @@ export function generateImage(promptText) {
         const library = characterLibrary();
         const text = decode(promptText).trim();
         const parsed = structured.parseAutopic(text, library, decode);
-        const payload = parsed || { prompt: text, characterPrompts: [] };
+        let payload = parsed || { prompt: text, characterPrompts: [] };
+        let run = nai;
+        if (NO_HUMANS.test(payload.prompt || '')) ({ payload, nai: run } = noHumans(payload, nai));
         return direct.generateDirect({
-            nai, prompt: payload.prompt, payload, library, context: ctx(),
+            nai: run, prompt: payload.prompt, payload, library, context: ctx(),
             getHeaders: ctx().getRequestHeaders, saveImage, letterbox,
         });
     });
     queue = job.catch(() => {});
     return job;
+}
+
+// A picture with no person in it (food, a view, an object): NovelAI still likes to slip eyes, faces or hands in,
+// and a character can come in from AutoPic's own prefix or imported characters even when the block has none.
+// So when the scene says "no humans", every way a person could get in is closed for this one picture.
+const NO_HUMANS = /(?:^|[,{(\s]|::)\s*no[ _]humans?\b/i;
+const PERSON = /^(?:\d+\s*(?:girl|boy|other)s?|solo|solo focus|multiple (?:girls|boys|others)|girl|boy|man|woman|men|women|person|people|humans?|male|female|couple|child|(?:pov )?hands?|fingers?|arms?|holding.*|eyes?|.*\beyes\b.*|face|.*\bface\b.*|lips|mouth|skin|.*\bhair\b.*|smile|smiling|blush|looking at .*|selfie|upper body|cowboy shot|full body|portrait|close-up of .*face.*|no humans?)$/i;
+const PEOPLE_UC = '2::human::, 2::person::, 1girl, 1boy, multiple girls, multiple boys, face, eyes, eye, hands, fingers, body parts, skin, hair, lips';
+const tagWord = tag => String(tag).replace(/^-?\d+(?:\.\d+)?::|::$/g, '').replace(/[{}[\]()]/g, '').replace(/:\s*-?\d+(?:\.\d+)?$/, '').replace(/_/g, ' ').trim();
+function noHumans(payload, nai) {
+    const keep = String(payload.prompt || '').split(',').map(t => t.trim()).filter(t => t && !PERSON.test(tagWord(t)));
+    const prompt = ['2::no humans::', 'still life', 'object focus', ...keep].join(', ');
+    const negative_prompt = [payload.negative_prompt, PEOPLE_UC].filter(Boolean).join(', ');
+    // the run's own copy of the settings: AutoPic's prefix without its character blocks or person tags, no imported characters
+    const mode = nai.generationMode;
+    const own = structuredClone(nai.directSettings?.[mode] || {});
+    if (own.prefix) own.prefix = String(own.prefix).replace(/<apchar\b[\s\S]*?<\/apchar>/gi, '').split(',').map(t => t.trim()).filter(t => t && !PERSON.test(tagWord(t))).join(', ');
+    own.useImportedCharacters = false;
+    return {
+        payload: { ...payload, prompt, negative_prompt, characterPrompts: [] },
+        nai: { ...nai, directSettings: { ...(nai.directSettings || {}), [mode]: own } },
+    };
 }
 
 /** Wrap plain tags as an <autopic> block so it is stored and displayed like AutoPic's. */
@@ -143,6 +167,7 @@ export function blockInstructions() {
 <picbox_task>
 You are an image prompt writer, not a roleplay partner. Convert the user's picture request into exactly one <autopic> block that follows the rules above.
 The request may be written in any language; the tags must be English.
+If the picture has no person in it (food, a view, a pet, an object), put no humans in <scene> and write no <apchar> at all.
 Output only the <autopic> block. No story, no explanation, no code fences.
 </picbox_task>`;
 }
