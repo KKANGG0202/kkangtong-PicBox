@@ -8,7 +8,7 @@ import { openGallery } from './gallery.js';
 import { openDraw } from './draw.js';
 import { syncInputButton } from './inputbutton.js';
 import { initStrip } from './strip.js';
-import './sentnote.js';   // registers picboxInterceptor (manifest generate_interceptor)
+import { initSentNote } from './sentnote.js';
 
 function closeWandMenu() {
     document.getElementById('extensionsMenu')?.classList.remove('openDrawer');
@@ -57,6 +57,7 @@ function registerCommands() {
         initLongPress();
         initRetry();
         initStrip();
+        initSentNote();
         syncInputButton();
         // Some themes or extensions rebuild the input bar later.
         setTimeout(syncInputButton, 3000);
