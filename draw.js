@@ -205,8 +205,8 @@ export function visibleWords(block) {
  * are left out, and the note says the photo is already in the chat and is not to be drawn again —
  * an earlier note that carried the raw tag list got copied into the next picture.
  */
-function photoNote(request, block) {
-    const name = String(ctx().name1 || 'User');
+function photoNote(request, block, who = '') {
+    const name = String(who || ctx().name1 || 'User');
     const clean = value => String(value || '').replace(/--/g, '-').replace(/\s+/g, ' ').trim();
     const what = clean(request);
     const seen = visibleWords(block);
@@ -237,7 +237,15 @@ async function sendAsUserMessage(src, block, request, reply, text = '', prefille
         },
     };
     c.chat.push(message);
+    // Sent the way SillyTavern sends a typed message, so extensions that act on a sent message see this one too
+    // (e.g. one that sends as an NPC sets its name and picture here, and the photo note then names the NPC).
+    const id = c.chat.length - 1;
+    try { await c.eventSource.emit(c.eventTypes.MESSAGE_SENT, id); } catch (error) { console.warn('[PicBox] sent', error); }
+    if (message.name && message.name !== c.name1 && getSettings().photoNote !== false) {
+        message.mes = `${text}${text ? '\n' : ''}${photoNote(request, block, message.name)}`;
+    }
     c.addOneMessage(message);
+    try { await c.eventSource.emit(c.eventTypes.USER_MESSAGE_RENDERED, id); } catch (error) { console.warn('[PicBox] rendered', error); }
     if (input && prefilled && String(input.value || '').trim() === prefilled) {
         input.value = '';
         input.dispatchEvent(new Event('input', { bubbles: true }));
